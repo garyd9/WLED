@@ -1,4 +1,5 @@
 #include "wled.h"
+#include "fx.h"
 #include <esp_task_wdt.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -113,6 +114,8 @@ void SensorsTask(void *p);
 void NextionSetup(void);
 // task dedicated to communication with the nextion device
 void NextionTask(void *);
+// for the userloop, (re)sets a segment color, speed, etc.  pass -1 for a parameter to ignore it.
+void ResetSegment(uint8_t nSegIdx, byte effect, byte speed, byte intensity, byte palette);
 
 
 void printAddress(DeviceAddress deviceAddress) 
@@ -621,7 +624,8 @@ void userConnected()
 
 void userLoop()
 {    
-    int nH2OTemp, nAirTemp, nDeltaTemp;
+    int nH2OTemp, nAirTemp, nDeltaTemp;    
+    static int nOldDelta = 0, nOldWater = 0;
 
     // the userLoop should only deal with the LED's and to forward sensor data to nextion
 #ifdef STACK_MONITOR    
@@ -648,21 +652,50 @@ void userLoop()
             nDeltaTemp = nH2OTemp - nAirTemp;
             nDeltaTemp = constrain(nDeltaTemp, -999, 999);
 
-            if (nDeltaTemp >= 70)
+            if ((nH2OTemp >= 350) && (nOldWater <= 0))
             {
-                if (35 != effectPalette)
-                {
-                    // change to "lava"
-                    effectPalette = 35;
-                    colorUpdated(NOTIFIER_CALL_MODE_DIRECT_CHANGE);
-                }
+                // change to "lava" (called 'fire' in the webUI) and "fire 2012"
+                nOldWater = 1;
+                ResetSegment(0, FX_MODE_FIRE_2012, 0, 100, 35);
             }
-            else if ((nDeltaTemp < 70) && (36 != effectPalette))
+            else if ((nH2OTemp < 350) && (nOldWater >= 0))
             {
-                // change to "icefire"
-                effectPalette = 36;
-                colorUpdated(NOTIFIER_CALL_MODE_DIRECT_CHANGE);
+                // change to "icefire" and "lake"
+                nOldWater = -1;
+                ResetSegment(0, FX_MODE_LAKE, 128, 128, 36);
+            }
+            if ((nDeltaTemp >= 70) && (nOldDelta <= 0))
+            {
+                nOldDelta = 1;
+                ResetSegment(1, FX_MODE_NOISEPAL, 128, 128, 35);
+                ResetSegment(2, FX_MODE_NOISEPAL, 128, 128, 35);
+            }
+            else if ((nDeltaTemp < 70) && (nOldDelta >= 0))
+            {
+                nOldDelta = -1;
+                ResetSegment(1, FX_MODE_TRICOLOR_WIPE, 194, 253, 0);
+                ResetSegment(2, FX_MODE_TRICOLOR_WIPE, 194, 253, 0);
             }
         }
+    }
+}
+void ResetSegment(uint8_t nSegIdx, byte effect, byte speed, byte intensity, byte palette)
+{
+    if (nSegIdx == strip.getMainSegmentId())
+    {
+        effectCurrent = (byte)effect;
+        effectSpeed = (byte)speed;
+        effectIntensity = (byte)intensity;
+        effectPalette = (byte)palette;
+        strip.applyToAllSelected = false;
+        colorUpdated(NOTIFIER_CALL_MODE_DIRECT_CHANGE);
+    }
+    else
+    {
+        WS2812FX::Segment& seg = strip.getSegment(nSegIdx);
+        strip.setMode(nSegIdx, (byte)effect);
+        seg.speed = (byte)speed;
+        seg.intensity = (byte)intensity;
+        seg.palette = (byte)palette;        
     }
 }
