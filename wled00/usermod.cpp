@@ -32,6 +32,8 @@
 #define MAX_TEMP 40
 // minimum temperature displayed by the graphs
 #define MIN_TEMP 20
+// Delta temp that will cause alert colors
+#define DELTA_ALERT 9
 // RGB value for nextion's red
 #define NEXTION_RED "63488"
 #define NEXTION_CYAN "21855"
@@ -510,12 +512,12 @@ void NextionTask(void *)
             {
                 // change the BORDER for delta
                 // change colors if we're going over 30.0 or under 30.0
-                if ((nDeltaTemp >= 70) && ((nNextDeltaTemp < 70) || !nNextDeltaTemp))
+                if ((nDeltaTemp >= (DELTA_ALERT*10)) && ((nNextDeltaTemp < (DELTA_ALERT*10)) || !nNextDeltaTemp))
                 {            
                     // change border to red
                     NextionSendCmd(DELTANAME ".borderc=" NEXTION_RED);
                 }
-                else if ((nDeltaTemp < 70) && ((nNextDeltaTemp >= 70) || !nNextDeltaTemp))
+                else if ((nDeltaTemp < (DELTA_ALERT*10)) && ((nNextDeltaTemp >= (DELTA_ALERT*10)) || !nNextDeltaTemp))
                 {
                     // change border to black (invisible)
                     NextionSendCmd(DELTANAME ".borderc=0");
@@ -664,13 +666,13 @@ void userLoop()
                 nOldWater = -1;
                 ResetSegment(0, FX_MODE_LAKE, 128, 128, 36);
             }
-            if ((nDeltaTemp >= 70) && (nOldDelta <= 0))
+            if ((nDeltaTemp >= (DELTA_ALERT*10)) && (nOldDelta <= 0))
             {
                 nOldDelta = 1;
                 ResetSegment(1, FX_MODE_NOISEPAL, 128, 128, 35);
                 ResetSegment(2, FX_MODE_NOISEPAL, 128, 128, 35);
             }
-            else if ((nDeltaTemp < 70) && (nOldDelta >= 0))
+            else if ((nDeltaTemp < (DELTA_ALERT*10)) && (nOldDelta >= 0))
             {
                 nOldDelta = -1;
                 ResetSegment(1, FX_MODE_TRICOLOR_WIPE, 194, 253, 0);
